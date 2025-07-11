@@ -1,4 +1,4 @@
-module alice-skill
+module github.com/spitfy/alice-skill
 
 go 1.24.3
 
