@@ -3,18 +3,34 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"github.com/golang/mock/gomock"
+	"github.com/spitfy/alice-skill/internal/store"
+	"github.com/spitfy/alice-skill/internal/store/mock"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhook(t *testing.T) {
-	handler := http.HandlerFunc(webhook)
+	ctrl := gomock.NewController(t)
+	s := mock.NewMockMessageStore(ctrl)
+	messages := []store.Message{
+		{
+			Sender:  "",
+			Time:    time.Now(),
+			Payload: "Hello!",
+		},
+	}
+	s.EXPECT().ListMessages(gomock.Any(), gomock.Any()).Return(messages, nil)
+	appInstance := newApp(s)
+
+	handler := http.HandlerFunc(appInstance.webhook)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -61,7 +77,7 @@ func TestWebhook(t *testing.T) {
 			method:       http.MethodPost,
 			body:         `{"request": {"type": "SimpleUtterance", "command": "sudo do something"}, "session": {"new": true}, "version": "1.0"}`,
 			expectedCode: http.StatusOK,
-			expectedBody: `Точное время .* часов, .* минут. Для вас нет новых сообщений.`,
+			expectedBody: `Точное время .* часов, .* минут. Для вас 1 новых сообщений.`,
 		},
 	}
 
@@ -91,7 +107,19 @@ func TestWebhook(t *testing.T) {
 // ...
 
 func TestGzipCompression(t *testing.T) {
-	handler := http.HandlerFunc(gzipMiddleware(webhook))
+	ctrl := gomock.NewController(t)
+	s := mock.NewMockMessageStore(ctrl)
+	messages := []store.Message{
+		{
+			Sender:  "",
+			Time:    time.Now(),
+			Payload: "Hello!",
+		},
+	}
+	s.EXPECT().ListMessages(gomock.Any(), gomock.Any()).Return(messages, nil).Times(2)
+	appInstance := newApp(s)
+
+	handler := gzipMiddleware(appInstance.webhook)
 
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -107,7 +135,7 @@ func TestGzipCompression(t *testing.T) {
 	// ожидаемое содержимое тела ответа при успешном запросе
 	successBody := `{
         "response": {
-            "text": "Для вас нет новых сообщений."
+            "text": "Для вас 1 новых сообщений."
         },
         "version": "1.0"
     }`

@@ -3,6 +3,7 @@ module github.com/spitfy/alice-skill
 go 1.24.3
 
 require (
+	github.com/golang/mock v1.6.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 )
