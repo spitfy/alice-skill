@@ -2,11 +2,14 @@
 package main
 
 import (
+	"database/sql"
 	"go.uber.org/zap"
 	"net/http"
 	"strings"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spitfy/alice-skill/internal/logger"
+	"github.com/spitfy/alice-skill/internal/store/pg"
 )
 
 // функция main вызывается автоматически при запуске приложения
@@ -23,7 +26,13 @@ func run() error {
 		return err
 	}
 
-	appInstance := newApp(nil)
+	conn, err := sql.Open("pgx", flagDatabaseURI)
+	if err != nil {
+		return err
+	}
+
+	appInstance := newApp(pg.NewStore(conn))
+
 	logger.Log.Info("Running server", zap.String("address", flagRunAddr))
 	// оборачиваем хендлер webhook в middleware с логированием
 	return http.ListenAndServe(flagRunAddr, logger.RequestLogger(gzipMiddleware(appInstance.webhook)))
